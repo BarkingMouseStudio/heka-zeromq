@@ -1,0 +1,6 @@
+[ZeroMQInput]
+address = "tcp://*:4001" # Address to bind zmq input
+
+[ZeroMQOutput]
+address = "tcp://*:5001" # Address to bind zmq output
+message_matcher = "TRUE"
