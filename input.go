@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	zmq "github.com/alecthomas/gozmq"
+	"github.com/mozilla-services/heka/message"
 	"github.com/mozilla-services/heka/pipeline"
 )
 
@@ -42,13 +43,6 @@ func (zi *ZeroMQInput) Run(ir pipeline.InputRunner, h pipeline.PluginHelper) err
 	// Get the InputRunner's chan to receive empty PipelinePacks
 	packs := ir.InChan()
 
-	out, ok := h.Output("ZeroMQOutput")
-	if !ok {
-		err := errors.New("Could not find ZeroMQOutput")
-		fmt.Println(err.Error())
-		return err
-	}
-
 	var pack *pipeline.PipelinePack
 	var count int
 	var b []byte
@@ -69,11 +63,14 @@ func (zi *ZeroMQInput) Run(ir pipeline.InputRunner, h pipeline.PluginHelper) err
 		count = len(b)
 		pack.MsgBytes = pack.MsgBytes[:count]
 
+		pack.Message = &message.Message{}
+		pack.Decoded = true
+
 		// Copy ws bytes into pack's bytes
 		copy(pack.MsgBytes, b)
 
-		// Send pack to output
-		out.Deliver(pack)
+		// Send pack into Heka pipeline
+		ir.Inject(pack)
 	}
 
 	return nil
