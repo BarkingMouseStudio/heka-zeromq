@@ -1,7 +1,6 @@
 package heka_websockets
 
 import (
-	"errors"
 	"fmt"
 	zmq "github.com/alecthomas/gozmq"
 	"github.com/mozilla-services/heka/pipeline"
@@ -26,13 +25,13 @@ func (zo *ZeroMQOutput) Init(config interface{}) error {
 
 	var err error
 	if zo.context, err = zmq.NewContext(); err != nil {
-		return errors.New(fmt.Sprintf("creating context – %s", err.Error()))
+		return fmt.Errorf("creating context – %s", err.Error())
 	}
 	if zo.socket, err = zo.context.NewSocket(zmq.PUB); err != nil {
-		return errors.New(fmt.Sprintf("creating socket – %s", err.Error()))
+		return fmt.Errorf("creating socket – %s", err.Error())
 	}
 	if err = zo.socket.Bind(zo.conf.Address); err != nil {
-		return errors.New(fmt.Sprintf("binding socket – %s", err.Error()))
+		return fmt.Errorf("binding socket – %s", err.Error())
 	}
 
 	return nil

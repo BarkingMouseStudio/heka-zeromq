@@ -1,15 +1,14 @@
 package heka_websockets
 
 import (
-	"errors"
 	"fmt"
 	zmq "github.com/alecthomas/gozmq"
-	"github.com/mozilla-services/heka/message"
 	"github.com/mozilla-services/heka/pipeline"
 )
 
 type ZeroMQInputConfig struct {
 	Address string `toml:"address"`
+	Decoder string `toml:"decoder"`
 }
 
 type ZeroMQInput struct {
@@ -19,7 +18,7 @@ type ZeroMQInput struct {
 }
 
 func (zi *ZeroMQInput) ConfigStruct() interface{} {
-	return &ZeroMQInputConfig{":4000"}
+	return &ZeroMQInputConfig{":4000", ""}
 }
 
 func (zi *ZeroMQInput) Init(config interface{}) error {
@@ -27,13 +26,13 @@ func (zi *ZeroMQInput) Init(config interface{}) error {
 
 	var err error
 	if zi.context, err = zmq.NewContext(); err != nil {
-		return errors.New(fmt.Sprintf("creating context – %s", err.Error()))
+		return fmt.Errorf("creating context – %s", err.Error())
 	}
 	if zi.socket, err = zi.context.NewSocket(zmq.PULL); err != nil {
-		return errors.New(fmt.Sprintf("creating context – %s", err.Error()))
+		return fmt.Errorf("creating context – %s", err.Error())
 	}
 	if err = zi.socket.Bind(zi.conf.Address); err != nil {
-		return errors.New(fmt.Sprintf("creating context – %s", err.Error()))
+		return fmt.Errorf("creating context – %s", err.Error())
 	}
 
 	return nil
@@ -42,6 +41,19 @@ func (zi *ZeroMQInput) Init(config interface{}) error {
 func (zi *ZeroMQInput) Run(ir pipeline.InputRunner, h pipeline.PluginHelper) error {
 	// Get the InputRunner's chan to receive empty PipelinePacks
 	packs := ir.InChan()
+
+	var decoding chan<- *pipeline.PipelinePack
+	if zi.conf.Decoder != "" {
+		// Fetch specified decoder
+		decoder, ok := h.DecoderSet().ByName(zi.conf.Decoder)
+		if !ok {
+			err := fmt.Errorf("Could not find decoder", zi.conf.Decoder)
+			return err
+		}
+
+		// Get the decoder's receiving chan
+		decoding = decoder.InChan()
+	}
 
 	var pack *pipeline.PipelinePack
 	var count int
@@ -52,8 +64,8 @@ func (zi *ZeroMQInput) Run(ir pipeline.InputRunner, h pipeline.PluginHelper) err
 	for {
 		b, err = zi.socket.Recv(0)
 		if err != nil {
-			fmt.Println(err.Error())
-			return err
+			ir.LogError(err)
+			continue
 		}
 
 		// Grab an empty PipelinePack from the InputRunner
@@ -63,14 +75,16 @@ func (zi *ZeroMQInput) Run(ir pipeline.InputRunner, h pipeline.PluginHelper) err
 		count = len(b)
 		pack.MsgBytes = pack.MsgBytes[:count]
 
-		pack.Message = &message.Message{}
-		pack.Decoded = true
-
 		// Copy ws bytes into pack's bytes
 		copy(pack.MsgBytes, b)
 
-		// Send pack into Heka pipeline
-		ir.Inject(pack)
+		if decoding != nil {
+			// Send pack onto decoder
+			decoding <- pack
+		} else {
+			// Send pack into Heka pipeline
+			ir.Inject(pack)
+		}
 	}
 
 	return nil
