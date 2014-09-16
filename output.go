@@ -46,10 +46,10 @@ func (zo *ZeroMQOutput) Run(or pipeline.OutputRunner, h pipeline.PluginHelper) e
 	var b []byte
 	var p [][]byte
 	for pc := range or.InChan() {
-		b = pc.Pack.MsgBytes
+		b = pc.MsgBytes
 		p = [][]byte{nil, b}
 		zo.socket.SendMultipart(p, 0)
-		pc.Pack.Recycle()
+		pc.Recycle()
 	}
 
 	return nil
