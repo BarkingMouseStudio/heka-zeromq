@@ -45,7 +45,7 @@ func (zi *ZeroMQInput) Run(ir pipeline.InputRunner, h pipeline.PluginHelper) err
 	var decoding chan<- *pipeline.PipelinePack
 	if zi.conf.Decoder != "" {
 		// Fetch specified decoder
-		decoder, ok := h.DecoderSet().ByName(zi.conf.Decoder)
+		decoder, ok := h.DecoderRunner(zi.conf.Decoder, fmt.Sprintf("%s-%s", ir.Name(), zi.conf.Decoder))
 		if !ok {
 			err := fmt.Errorf("Could not find decoder", zi.conf.Decoder)
 			return err
